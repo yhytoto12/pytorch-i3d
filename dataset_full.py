@@ -51,10 +51,10 @@ def load_rgb_frames(image_dir, vid, start, num):
 
 def load_flow_frames_LSMDC(vid, start, num):
     frames = [
-        np.asarray(
-            cv2.resize(cv2.imread(os.path.join(vid,'x_'+str(i).zfill(5)+'.jpg'), cv2.IMREAD_GRAYSCALE), (455,256)),
-            cv2.resize(cv2.imread(os.path.join(vid,'y_'+str(i).zfill(5)+'.jpg'), cv2.IMREAD_GRAYSCALE), (455,256))
-        ).transpose([1,2,0])/127.5 - 1 for i in range(start, start+num)
+        np.asarray([
+            cv2.resize(cv2.imread(os.path.join(vid,'x_'+str(i).zfill(5)+'.jpg'), cv2.IMREAD_GRAYSCALE), (455,256))/127.5-1,
+            cv2.resize(cv2.imread(os.path.join(vid,'y_'+str(i).zfill(5)+'.jpg'), cv2.IMREAD_GRAYSCALE), (455,256))/127.5-1
+        ]).transpose([1,2,0]) for i in range(start, start+num)
     ]
     return np.asarray(frames, dtype=np.float32)
 
@@ -87,6 +87,10 @@ def make_dataset_LSMDC(root, mode):
 
     for vid in tqdm(data, desc='load path'):
         num_frames = len(glob.glob(os.path.join(vid,'*')))-1
+        if mode=='flow':
+            # Flow directory contains both x-dim and y-dim files,
+            # thereby dividing directory_length by 2 is necessary
+            num_frames = num_frames // 2
         dataset.append((vid, num_frames))
     return dataset
 
