@@ -4,6 +4,17 @@
 
 > conda env create -f pi3d_environment.yml
 
+## Feature info
+
+_This info may deviate from the original I3D implementation or source repository_
+
+* `fc` feature: (T, 1024)
+* `map` feature: (T, 7, 7, 1024), where (T, H, W, C)
+* RGB frames: From 2nd image (in order to align with Flow frames)
+* Temporal scaling: (x-1)/8, where x=(no. of flow frames)
+* Temporal receptor field: 27 (+19 per additional feature)
+  * Features are still extractable for shorter videos due to padding
+
 ## Overview
 
 This repository contains trained models reported in the paper "[Quo Vadis,
