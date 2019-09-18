@@ -301,6 +301,8 @@ class InceptionI3d(nn.Module):
                              use_bias=True,
                              name='logits')
 
+        self.map_pool = nn.AvgPool3d(kernel_size=[2,1,1], stride=(1,1,1))
+
         self.build()
 
 
@@ -335,4 +337,4 @@ class InceptionI3d(nn.Module):
         for end_point in self.VALID_ENDPOINTS:
             if end_point in self.end_points:
                 x = self._modules[end_point](x)
-        return self.avg_pool(x)
+        return self.map_pool(x), self.avg_pool(x)

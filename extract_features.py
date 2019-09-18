@@ -19,7 +19,7 @@ import numpy as np
 
 from pytorch_i3d import InceptionI3d
 
-from dataset_full import LSMDC as Dataset
+from dataset_lsmdc import LSMDC as Dataset
 from config import config
 
 
@@ -43,7 +43,7 @@ def run(cfg):
     tot_loc_loss = 0.0
     tot_cls_loss = 0.0
 
-    logit_dir = cfg['save_dir']+'_logit'
+    map_dir = cfg['save_dir']+'_map'
 
     # Iterate over data.
     for data in tqdm(dataloader):
@@ -56,33 +56,43 @@ def run(cfg):
         elif os.path.exists(os.path.join(cfg['save_dir'], mov, name[0]+'.npy')):
             continue
 
-        if not os.path.exists(os.path.join(logit_dir, mov)):
-            os.mkdir(os.path.join(logit_dir, mov))
-
-        if cfg['save_npy']:
-            if not os.path.exists(os.path.join(cfg['backup_dir'],cfg['mode'],mov)):
-                os.mkdir(os.path.join(cfg['backup_dir'],cfg['mode'],mov))
-            np.save(os.path.join(cfg['backup_dir'],cfg['mode'],mov,name[0]),inputs)
+        if not os.path.exists(os.path.join(map_dir, mov)):
+            os.mkdir(os.path.join(map_dir, mov))
 
         b,c,t,h,w = inputs.shape
         if t > 1600:
             features = []
-            logits = []
+            maps = []
             for start in range(1, t-56, 1600):
                 end = min(t-1, start+1600+56)
+                do_end_crop = True if end == start+1600+56 else False
                 start = max(1, start-48)
+                do_start_crop = True if start == start-48 else False
                 ip = Variable(torch.from_numpy(inputs.numpy()[:,:,start:end]).cuda(), volatile=True)
-                features.append(i3d.extract_features(ip).squeeze(0).permute(1,2,3,0).squeeze().data.cpu().numpy())
-                logits.append(i3d.forward(ip).squeeze().permute(1,0).data.cpu().numpy())
+                map_pool, avg_pool = i3d.extract_features(inputs)
+                map_pool = map_pool.squeeze(0).permute(1,2,3,0).data.cpu().numpy()
+                avg_pool = avg_pool.squeeze(0).squeeze(-1).squeeze(-1).permute(-1,0).data.cpu().numpy()
+                if do_end_crop:
+                    map_pool = map_pool[:-6,:,:,:]
+                    avg_pool = avg_pool[:-6,:]
+                if do_start_crop:
+                    map_pool = map_pool[6:,:,:,:]
+                    avg_pool = avg_pool[6:,:]
+                maps.append(map_pool)
+                features.append(avg_pool)
             np.save(os.path.join(cfg['save_dir'], mov, name[0]), np.concatenate(features, axis=0))
-            np.save(os.path.join(logit_dir, mov, name[0]), np.concatenate(logits, axis=0))
+            np.save(os.path.join(map_dir, mov, name[0]), np.concatenate(maps, axis=0))
         else:
-            # wrap them in Variable
             inputs = Variable(inputs.cuda(), volatile=True)
-            features = i3d.extract_features(inputs)
-            np.save(os.path.join(cfg['save_dir'], mov, name[0]), features.squeeze(0).permute(1,2,3,0).squeeze().data.cpu().numpy())
-            logit = i3d.forward(inputs)
-            np.save(os.path.join(logit_dir, mov, name[0]), logit.squeeze().permute(1,0).data.cpu().numpy())
+            map_pool, avg_pool = i3d.extract_features(inputs)
+            np.save(
+                os.path.join(cfg['save_dir'], mov, name[0]),
+                avg_pool.squeeze(0).squeeze(-1).squeeze(-1).permute(-1,0).data.cpu().numpy()
+            )
+            np.save(
+                os.path.join(map_dir, mov, name[0]),
+                map_pool.squeeze(0).permute(1,2,3,0).data.cpu().numpy()
+            )
 
 
 if __name__ == '__main__':
