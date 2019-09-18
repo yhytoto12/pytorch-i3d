@@ -1,7 +1,7 @@
 config = {
-    'mode': 'flow',
-    'load_model': './models/flow_imagenet.pt',
-    'data_dir': '/data1/hsyn/LSMDC/flow01',
-    'save_dir': '/data1/hsyn/LSMDC/i3d_flow',
+    'mode': 'rgb',
+    'load_model': './models/rgb_imagenet.pt',
+    'data_dir': '/data2/yj/LSMDC/image',
+    'save_dir': '/data2/yj/LSMDC/i3d_rgb',
     'batch_size': 1,
 }

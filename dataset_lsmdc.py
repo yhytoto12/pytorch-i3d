@@ -46,7 +46,15 @@ def make_dataset(root, mode):
     dataset = []
     mode = 'image' if mode=='rgb' else 'flow'
     data = list(filter(
-        lambda f: os.path.isdir(f),
+        lambda f: os.path.isdir(f) and f.split('/')[-1] in [
+"0019_Pulp_Fiction_00.48.08.271-00.49.52.747",
+"0008_Fargo_00.16.06.297-00.17.26.000",
+"3012_BRUNO_00.34.48.536-00.37.16.363",
+"0025_THE_LORD_OF_THE_RINGS_THE_RETURN_OF_THE_KING_03.07.32.821-03.08.48.393",
+"1012_Unbreakable_01.21.21.721-01.21.22.815",
+"1012_Unbreakable_00.55.56.510-00.55.59.634",
+"1050_Harry_Potter_and_the_deathly_hallows_Disk_One_01.50.41.516-01.53.37.673"
+],
         glob.glob(os.path.join(root,'*','*'))
     ))
 
