@@ -14,12 +14,12 @@ import os.path
 
 import cv2
 
-def video_to_tensor(pic):
+def video_to_tensor(pic, mode):
     """Convert a ``numpy.ndarray`` to tensor.
     Converts a numpy.ndarray (T x H x W x C)
     to a torch.FloatTensor of shape (C x T x H x W)
     """
-    return torch.from_numpy(pic.transpose([3,0,1,2]))
+    return torch.from_numpy(pic.transpose([3,0,1,2] if mode != "image" else [0,3,1,2]))
 
 
 def load_rgb_frames(vid, start, num):
@@ -42,9 +42,18 @@ def load_flow_frames(vid, start, num):
     return np.asarray(frames, dtype=np.float32)
 
 
+def load_image_frames(vid, start, num):
+    frames = [
+        cv2.resize(
+            cv2.imread(os.path.join(vid, str(start+3+(i*8)).zfill(6)+'.jpg')),
+            (455,256)
+        )[:,:,[2,1,0]]/127.5 - 1 for i in range(0, int((num-1)/8))
+    ]
+    return np.asarray(frames, dtype=np.float32)
+
+
 def make_dataset(root, mode):
     dataset = []
-    mode = 'image' if mode=='rgb' else 'flow'
     data = list(filter(
         lambda f: os.path.isdir(f),
         glob.glob(os.path.join(root,'*','*'))
@@ -91,8 +100,10 @@ class LSMDC(data_utl.Dataset):
 
         if self.mode == 'rgb':
             imgs = load_rgb_frames(vid, 2, nf)
-        else:
+        elif self.mode == 'flow':
             imgs = load_flow_frames(vid, 1, nf)
+        else:
+            imgs = load_image_frames(vid, 2, nf)
 
         imgs = self.transforms(imgs)
 
@@ -101,7 +112,7 @@ class LSMDC(data_utl.Dataset):
         #    os.mkdir(os.path.join(back_dir,self.mode,mov))
         #np.save(os.path.join(back_dir,self.mode,mov,vname), imgs)
 
-        return video_to_tensor(imgs), vname
+        return video_to_tensor(imgs, self.mode), vname
 
     def __len__(self):
         return len(self.data)

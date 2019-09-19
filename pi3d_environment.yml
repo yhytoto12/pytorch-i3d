@@ -1,4 +1,4 @@
-name: pi3d
+name: next
 channels:
   - pytorch
   - defaults
@@ -70,5 +70,5 @@ dependencies:
     - h5py==2.9.0
     - munch==2.3.2
     - tqdm==4.35.0
-prefix: /home/yj/.miniconda3/envs/pi3d
+prefix: /home/yj/.miniconda3/envs/next
 

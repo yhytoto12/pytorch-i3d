@@ -4,6 +4,7 @@ import argparse
 
 import time
 import torch
+import torch.hub
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
@@ -22,6 +23,13 @@ from pytorch_i3d import InceptionI3d
 from dataset_lsmdc import LSMDC as Dataset
 from config import config
 
+# https://discuss.pytorch.org/t/extract-features-from-layer-of-submodule-of-a-model/20181/2
+activation = {}
+def get_activation(name):
+    def hook(model, input, output):
+        activation[name] = output.detach()
+    return hook
+
 
 def run(cfg):
     # setup dataset
@@ -32,10 +40,19 @@ def run(cfg):
     # setup the model
     if cfg['mode'] == 'flow':
         i3d = InceptionI3d(400, in_channels=2)
-    else:
+    elif cfg['mode'] == 'rgb':
         i3d = InceptionI3d(400, in_channels=3)
+    elif cfg['mode'] == 'image':
+        i3d = torch.hub.load('facebookresearch/WSL-Images', 'resnext101_32x32d_wsl')
+    else:
+        print('Invalid mode')
+        return
     # i3d.replace_logits(157)
-    i3d.load_state_dict(torch.load(cfg['load_model']))
+    if cfg['mode'] != 'image':
+        i3d.load_state_dict(torch.load(cfg['load_model']))
+    else:
+        i3d.layer4.register_forward_hook(get_activation('layer4'))
+        i3d.avgpool.register_forward_hook(get_activation('avgpool'))
     i3d.cuda()
     i3d.train(False)  # Set model to evaluate mode
 
@@ -49,6 +66,34 @@ def run(cfg):
         os.mkdir(cfg['save_dir'])
     if not os.path.exists(map_dir):
         os.mkdir(map_dir)
+
+    if cfg['mode'] == 'image':
+        for data in tqdm(dataloader):
+            # get the inputs
+            inputs, name = data
+            mov = '_'.join(name[0].split('_')[:-1])
+
+            if not os.path.exists(os.path.join(cfg['save_dir'], mov)):
+                os.mkdir(os.path.join(cfg['save_dir'], mov))
+            elif os.path.exists(os.path.join(cfg['save_dir'], mov, name[0]+'.npy')):
+                continue
+
+            if not os.path.exists(os.path.join(map_dir, mov)):
+                os.mkdir(os.path.join(map_dir, mov))
+
+            b,c,t,h,w = inputs.shape
+            features = []
+            maps = []
+            for i in range(t):
+                with torch.no_grad():
+                    frame = Variable(inputs[:,i,:,:,:].cuda())
+                    out = i3d(frame)
+                print('{} {}'.format(activation['layer4'].squeeze(), activation['avgpool'].squeeze()))
+                maps.append(activation['layer4'].squeeze().data.cpu().numpy())
+                features.append(activation['avgpool'].squeeze().data.cpu().numpy())
+            np.save(os.path.join(cfg['save_dir'], mov, name[0]), np.asarray(features))
+            np.save(os.path.join(map_dir), np.asarray(maps))
+        return
 
     # Iterate over data.
     for data in tqdm(dataloader):

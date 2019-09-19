@@ -4,6 +4,9 @@
 
 > conda env create -f pi3d_environment.yml
 
+**Update pytorch to 1.1!**
+> conda install pytorch torchvision cudatoolkit=9.0 -c pytorch
+
 ## Feature info
 
 _This info may deviate from the original I3D implementation or source repository_
