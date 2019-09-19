@@ -88,8 +88,7 @@ def run(cfg):
                 with torch.no_grad():
                     frame = Variable(inputs[:,i,:,:,:].cuda())
                     out = i3d(frame)
-                print('{} {}'.format(activation['layer4'].squeeze(), activation['avgpool'].squeeze()))
-                maps.append(activation['layer4'].squeeze().data.cpu().numpy())
+                maps.append(activation['layer4'].squeeze().permute(1,2,0).data.cpu().numpy())
                 features.append(activation['avgpool'].squeeze().data.cpu().numpy())
             np.save(os.path.join(cfg['save_dir'], mov, name[0]), np.asarray(features))
             np.save(os.path.join(map_dir), np.asarray(maps))
