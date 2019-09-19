@@ -81,7 +81,7 @@ def run(cfg):
             if not os.path.exists(os.path.join(map_dir, mov)):
                 os.mkdir(os.path.join(map_dir, mov))
 
-            b,c,t,h,w = inputs.shape
+            b,t,c,h,w = inputs.shape
             features = []
             maps = []
             for i in range(t):
