@@ -22,21 +22,21 @@ def video_to_tensor(pic):
     return torch.from_numpy(pic.transpose([3,0,1,2]))
 
 
-def load_rgb_frames(vid, start, num):
+def load_rgb_frames(vid, start, num, si):
     frames = [
         cv2.resize(
             cv2.imread(os.path.join(vid, str(i).zfill(6)+'.jpg')),
-            (455,256)
+            (int(720*224/si),224)
         )[:,:,[2,1,0]]/127.5 - 1 for i in range(start, start+num)
     ]
     return np.asarray(frames, dtype=np.float32)
 
 
-def load_flow_frames(vid, start, num):
+def load_flow_frames(vid, start, num, si):
     frames = [
         np.asarray([
-            cv2.resize(cv2.imread(os.path.join(vid,'x_'+str(i).zfill(5)+'.jpg'), cv2.IMREAD_GRAYSCALE), (455,256))/127.5-1,
-            cv2.resize(cv2.imread(os.path.join(vid,'y_'+str(i).zfill(5)+'.jpg'), cv2.IMREAD_GRAYSCALE), (455,256))/127.5-1
+            cv2.resize(cv2.imread(os.path.join(vid,'x_'+str(i).zfill(5)+'.jpg'), cv2.IMREAD_GRAYSCALE), (int(720*224/si),224))/127.5-1,
+            cv2.resize(cv2.imread(os.path.join(vid,'y_'+str(i).zfill(5)+'.jpg'), cv2.IMREAD_GRAYSCALE), (int(720*224/si),224))/127.5-1
         ]).transpose([1,2,0]) for i in range(start, start+num)
     ]
     return np.asarray(frames, dtype=np.float32)
@@ -70,6 +70,7 @@ class LSMDC(data_utl.Dataset):
         self.mode = mode
         self.root = root
         self.save_dir = save_dir
+        self.shapedict = json.load(open('size.json','r'))
 
     def __getitem__(self, index):
         """
@@ -90,9 +91,9 @@ class LSMDC(data_utl.Dataset):
         #    return np.load(os.path.join(back_dir,self.mode,mov,vname+'.npy')), vname
 
         if self.mode == 'rgb':
-            imgs = load_rgb_frames(vid, 2, nf)
+            imgs = load_rgb_frames(vid, 2, nf, s)
         else:
-            imgs = load_flow_frames(vid, 1, nf)
+            imgs = load_flow_frames(vid, 1, nf, s)
 
         imgs = self.transforms(imgs)
 
