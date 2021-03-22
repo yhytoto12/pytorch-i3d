@@ -20,82 +20,81 @@ import numpy as np
 from pytorch_i3d import InceptionI3d
 
 from dataset_20bn import TwentyBN as Dataset
-from config import config
 
+parser = argparse.ArgumentParser()
+parser.add_argument('--mode', type=str, help='rgb or flow', default=cfg['mode'])
+parser.add_argument('--load_model', type=str, default=cfg['load_model'])
+parser.add_argument('--data_dir', type=str, default=cfg['data_dir'])
+parser.add_argument('--save_dir', type=str, default=cfg['save_dir'])
+parser.add_argument('--start_index', type=int)
+parser.add_argument('--end_index', type=int)
 
-def run(cfg):
+args = parser.parse_args()
+cfg = {
+    'mode' : args.mode,
+    'load_model' : args.load_model,
+    'data_dir' : args.data_dir,
+    'save_dir' : args.save_dir,
+    'start_index' : args.start_index,
+    'end_index' : args.end_index,
+}
+
+def run():
     # setup dataset
     test_transforms = transforms.Compose([videotransforms.CenterCrop(224)])
-    dataset = Dataset(root=cfg['data_dir'], mode=cfg['mode'], transforms=test_transforms, num=-1, save_dir=cfg['save_dir'])
-    dataloader = torch.utils.data.DataLoader(dataset, batch_size=cfg['batch_size'], shuffle=False, num_workers=16, pin_memory=True)
+    dataset = Dataset(
+        data_dir=cfg['data_dir'],
+        mode=cfg['mode'],
+        transforms=test_transforms,
+        save_dir=cfg['save_dir'],
+        start_index=args.start_index,
+        end_index=args.end_index)
+    dataloader = torch.utils.data.DataLoader(dataset, batch_size=1, shuffle=False, num_workers=4, pin_memory=True)
 
     # setup the model
-    if cfg['mode'] == 'flow':
+    if args.mode == 'flow':
         i3d = InceptionI3d(400, in_channels=2)
-    else:
+    else:   # rgb
         i3d = InceptionI3d(400, in_channels=3)
 
-    i3d.load_state_dict(torch.load(cfg['load_model']))
+    i3d.load_state_dict(torch.load(args.load_model))
     i3d.cuda()
     i3d.train(False)  # Set model to evaluate mode
 
-    map_dir = cfg['save_dir']+'_map'
+    save_dir = args.save_dir
+    map_dir = save_dir + '_map'
 
-    if not os.path.exists(cfg['save_dir']):
-        os.mkdir(cfg['save_dir'])
+    if not os.path.exists(save_dir):
+        os.mkdir(save_dir)
     if not os.path.exists(map_dir):
         os.mkdir(map_dir)
 
     # Iterate over data.
     for data in tqdm(dataloader):
-        # get the inputs
-        inputs, name = data
-        mov = '_'.join(name[0].split('_')[:-1])
+        # get the inputs and video name
+        inputs, vid_name = data
 
-        if not os.path.exists(os.path.join(cfg['save_dir'], mov)):
-            os.mkdir(os.path.join(cfg['save_dir'], mov))
-        elif os.path.exists(os.path.join(cfg['save_dir'], mov, name[0]+'.npy')):
+        if not os.path.exists(os.path.join(save_dir, vid_name)):
+            os.mkdir(os.path.join(save_dir, vid_name))
+        elif os.path.exists(os.path.join(save_dir, vid_name + '.npy')):
             continue
 
-        if not os.path.exists(os.path.join(map_dir, mov)):
-            os.mkdir(os.path.join(map_dir, mov))
+        if not os.path.exists(os.path.join(map_dir, vid_name)):
+            os.mkdir(os.path.join(map_dir, vid_name))
 
         b,c,t,h,w = inputs.shape
 
-        if t > 1600:
-            features = []
-            maps = []
-            for start in range(1, t-56, 1600):
-                end = min(t-1, start+1600+56)
-                do_end_crop = True if end == start+1600+56 else False
-                start = max(1, start-48)
-                do_start_crop = True if start != 1 else False
-                ip = Variable(torch.from_numpy(inputs.numpy()[:,:,start:end]).cuda(), volatile=True)
-                map_pool, avg_pool = i3d.extract_features(ip)
-                map_pool = map_pool.squeeze(0).permute(1,2,3,0).data.cpu().numpy()
-                avg_pool = avg_pool.squeeze(0).squeeze(-1).squeeze(-1).permute(-1,0).data.cpu().numpy()
-                if do_end_crop:
-                    map_pool = map_pool[:-6,:,:,:]
-                    avg_pool = avg_pool[:-6,:]
-                if do_start_crop:
-                    map_pool = map_pool[6:,:,:,:]
-                    avg_pool = avg_pool[6:,:]
-                maps.append(map_pool)
-                features.append(avg_pool)
-            np.save(os.path.join(cfg['save_dir'], mov, name[0]), np.concatenate(features, axis=0))
-            np.save(os.path.join(map_dir, mov, name[0]), np.concatenate(maps, axis=0))
-        else:
-            inputs = Variable(inputs.cuda(), volatile=True)
-            map_pool, avg_pool = i3d.extract_features(inputs)
-            np.save(
-                os.path.join(cfg['save_dir'], mov, name[0]),
-                avg_pool.squeeze(0).squeeze(-1).squeeze(-1).permute(-1,0).data.cpu().numpy()
-            )
-            np.save(
-                os.path.join(map_dir, mov, name[0]),
-                map_pool.squeeze(0).permute(1,2,3,0).data.cpu().numpy()
-            )
+        inputs = Variable(inputs.cuda(), volatile=True)
+        map_pool, avg_pool = i3d.extract_features(inputs)
+        np.save(
+            os.path.join(save_dir, vid_name),
+            avg_pool.squeeze(0).squeeze(-1).squeeze(-1).permute(-1,0).data.cpu().numpy()
+        )
+        np.save(
+            os.path.join(map_dir, vid_name),
+            map_pool.squeeze(0).permute(1,2,3,0).data.cpu().numpy()
+        )
 
 
 if __name__ == '__main__':
-    run(config)
+    run()

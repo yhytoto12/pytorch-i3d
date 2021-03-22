@@ -39,12 +39,12 @@ def load_flow_frames(vid, start, num):
     ]
     return np.asarray(frames, dtype=np.float32)
 
-def make_dataset(root, mode):
+def make_dataset(data_dir, mode, start_index, end_index):
     dataset = []
     data = list(filter(
         lambda f: os.path.isdir(f),
-        glob.glob(os.path.join(root, "*"))
-    ))
+        glob.glob(os.path.join(data_dir, "*"))
+    ))[start_index:end_index]
 
     for vid in tqdm(data, desc="load path"):
         num_frames = len(glob.glob(os.path.join(vid, "*")))
@@ -60,12 +60,14 @@ def make_dataset(root, mode):
     return dataset
 
 class TwentyBN(data_utl.Dataset):
-    def __init__(self, root, mode, transforms=None, save_dir='', num=0):
+    def __init__(self, data_dir, mode, transforms=None, save_dir='', start_index, end_index):
         self.data = make_dataset(root, mode)
         self.transforms = transforms
         self.mode = mode
         self.root = root
         self.save_dir = save_dir
+        self.start_index = start_index
+        self.end_index = end_index
         print("[Log] number of data : {}".format(len(self.data)))
 
     def __getitem__(self, index):
@@ -74,14 +76,15 @@ class TwentyBN(data_utl.Dataset):
             index (int): Index
 
         Returns:
-            tuple: (image, target) where ``target`` is class_index of the target class.
+            tuple: (image, vid_name)
         """
         vid, nf = self.data[index] # get index-th video and the number of frames
-        vid_name = vid.split('/')[-1]
+        vid_name = vid.split('/')[-1] # get video name
 
         # if the video is already processed and saved correctly, then ignore it!
-        if os.path.exists(os.path.join(self.save_dir, vid + '.npy')):
-            return 0, 0, vid
+        # this is from memory saving
+        if os.path.exists(os.path.join(self.save_dir, vid_name + '.npy')):
+            return 0, vid_name
 
         if self.mode == 'rgb':
             imgs = load_rgb_frames(vid, 2, nf)
