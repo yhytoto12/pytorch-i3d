@@ -19,7 +19,7 @@ import numpy as np
 
 from pytorch_i3d import InceptionI3d
 
-from dataset_lsmdc import LSMDC as Dataset
+from dataset_20bn import TwentyBN as Dataset
 from config import config
 
 
@@ -27,21 +27,17 @@ def run(cfg):
     # setup dataset
     test_transforms = transforms.Compose([videotransforms.CenterCrop(224)])
     dataset = Dataset(root=cfg['data_dir'], mode=cfg['mode'], transforms=test_transforms, num=-1, save_dir=cfg['save_dir'])
-    dataloader = torch.utils.data.DataLoader(dataset, batch_size=cfg['batch_size'], shuffle=True, num_workers=16, pin_memory=True)
+    dataloader = torch.utils.data.DataLoader(dataset, batch_size=cfg['batch_size'], shuffle=False, num_workers=16, pin_memory=True)
 
     # setup the model
     if cfg['mode'] == 'flow':
         i3d = InceptionI3d(400, in_channels=2)
     else:
         i3d = InceptionI3d(400, in_channels=3)
-    # i3d.replace_logits(157)
+
     i3d.load_state_dict(torch.load(cfg['load_model']))
     i3d.cuda()
     i3d.train(False)  # Set model to evaluate mode
-
-    tot_loss = 0.0
-    tot_loc_loss = 0.0
-    tot_cls_loss = 0.0
 
     map_dir = cfg['save_dir']+'_map'
 
@@ -65,7 +61,7 @@ def run(cfg):
             os.mkdir(os.path.join(map_dir, mov))
 
         b,c,t,h,w = inputs.shape
-        #print('LOG: {} shape: {}'.format(name[0], inputs.shape))
+
         if t > 1600:
             features = []
             maps = []
@@ -79,22 +75,18 @@ def run(cfg):
                 map_pool = map_pool.squeeze(0).permute(1,2,3,0).data.cpu().numpy()
                 avg_pool = avg_pool.squeeze(0).squeeze(-1).squeeze(-1).permute(-1,0).data.cpu().numpy()
                 if do_end_crop:
-                    #print('LOG: do end crop')
                     map_pool = map_pool[:-6,:,:,:]
                     avg_pool = avg_pool[:-6,:]
                 if do_start_crop:
-                    #print('LOG: do start crop')
                     map_pool = map_pool[6:,:,:,:]
                     avg_pool = avg_pool[6:,:]
                 maps.append(map_pool)
                 features.append(avg_pool)
-                #print('LOG: maps: {}, features: {}'.format(map_pool.shape, avg_pool.shape))
             np.save(os.path.join(cfg['save_dir'], mov, name[0]), np.concatenate(features, axis=0))
             np.save(os.path.join(map_dir, mov, name[0]), np.concatenate(maps, axis=0))
         else:
             inputs = Variable(inputs.cuda(), volatile=True)
             map_pool, avg_pool = i3d.extract_features(inputs)
-            #print('LOG: maps: {}, features: {}'.format(map_pool.shape, avg_pool.shape))
             np.save(
                 os.path.join(cfg['save_dir'], mov, name[0]),
                 avg_pool.squeeze(0).squeeze(-1).squeeze(-1).permute(-1,0).data.cpu().numpy()
